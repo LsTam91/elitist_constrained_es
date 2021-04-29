@@ -8,7 +8,7 @@ import numpy as np
 from problem import SphereLinCons
 
 
-class Cholesky_11_ES:
+class CholeskyElitistES:
     """
     Implementation of the (1+1)-Cholesky-CMA-ES without constraint.
     It is the implementation presented in the article:
@@ -108,7 +108,7 @@ def fmin(f, x0, sigma0, options=None):
     """
     Standard interface to unconstrained optimization
     """
-    es = Cholesky_11_ES(x0, sigma0, options)
+    es = CholeskyElitistES(x0, sigma0, options)
     while not es.stop():
         x = es.ask()
         es.tell(x, f(x))
@@ -116,7 +116,7 @@ def fmin(f, x0, sigma0, options=None):
     return x
 
 
-class ElitistES:
+class ActiveElitistES:
     """
     It is the implementation of the algorithm presented in the article:
     'A (1+1)-CMA-ES for Constrained Optimisation'
