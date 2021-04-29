@@ -49,6 +49,7 @@ class Cholesky_11_ES:
 
         if lbd == 1:
             self.x = x
+            self.stagnation = 0
             self.fct.append(f)
             self.best.append(f)
             self._updateCholesky()
@@ -110,3 +111,4 @@ def sphere(x):
 
 if __name__ == "__main__":
     x = fmin(sphere, np.ones(5), 1)
+    print(x)
