@@ -5,6 +5,7 @@
 
 
 import numpy as np
+from problem import SphereLinCons
 
 
 class Cholesky_11_ES:
@@ -113,19 +114,6 @@ def fmin(f, x0, sigma0, options=None):
         es.tell(x, f(x))
 
     return x
-
-
-def sphere(x):
-    x = np.asarray(x)
-    return sum(x**2)
-
-
-if __name__ == "__main__":
-    x = fmin(sphere, np.ones(5), 1)
-    print(x)
-
-
-# In[81]:
 
 
 class ElitistES:
@@ -291,7 +279,7 @@ class ElitistES:
             return True
 
 
-def f_g_min(f, g, x0, sigma0, options=None):
+def fmin_con(f, g, x0, sigma0, options=None):
     """
     Interface for constrained optimization
     """
@@ -303,15 +291,17 @@ def f_g_min(f, g, x0, sigma0, options=None):
     return es.x
 
 
-def sphere(x):
-    x = np.asarray(x)
-    return sum(x**2)
-
-
-def const(x):
-    return 1 - x
-
-
 if __name__ == "__main__":
-    x = f_g_min(sphere, const, np.ones(5)*10, 1)
+    dimension = 5
+    x0 = np.ones(dimension) * dimension
+    sigma0 = 1
+
+    problem = SphereLinCons(dimension, 0)
+    x = fmin(problem.f, x0, sigma0)
+    print(problem)
+    print(x)
+
+    problem = SphereLinCons(dimension, 1)
+    x = fmin_con(problem.f, problem.g, x0, 1)
+    print(problem)
     print(x)
