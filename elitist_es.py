@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # In[1]:
 
 
 import numpy as np
 from problem import SphereLinCons
+from scipy.stats import ortho_group
 
 
 class CholeskyElitistES:
@@ -129,7 +129,7 @@ class ActiveElitistES:
         self.dim = len(x0)
         self.A = np.eye(self.dim)
         self.fct = [1e15]
-        self.z = np.zeros(self.dim)
+        self.z = np.ones(self.dim) * 1e-4
         self.v = np.array([])
         self.w = np.array([])
 
@@ -153,38 +153,40 @@ class ActiveElitistES:
         self.best = []
         self.TolX = 1e-12 * sigma0
 
+        self.stop_now = False
+
     def ask(self):
         """
         Sample a candidate solution from x
         """
         self.z = np.random.normal(size=self.dim)
+
         return self.x + self.sigma * self.A.dot(self.z)
 
     def tell(self, x_new, objective, g):
         """
         Update the ES internal model from x and its objective value f(x)
         """
-        if self._updateConstraint(g):
-            return
+        not_good = self._updateConstraint(g)
+        if not not_good:
+            f = objective(x_new)
+            lbd = 1 * (f <= self.fct[-1])
+            self._updateStepSize(lbd)
 
-        f = objective(x_new)
-        lbd = 1 * (f <= self.fct[-1])
-        self._updateStepSize(lbd)
+            if lbd == 1:
+                self.x = x_new
+                self.fct.append(f)
+                self.best.append(f)
+                self._updateCholesky()
+                self.stagnation = 0
 
-        if lbd == 1:
-            self.x = x_new
-            self.fct.append(f)
-            self.best.append(f)
-            self._updateCholesky()
-            self.stagnation = 0
+            else:
+                self.fct.append(self.fct[-1])
+                self.stagnation += 1
 
-        else:
-            self.fct.append(self.fct[-1])
-            self.stagnation += 1
-
-        if len(self.fct) > 5 and sum(self.fifth_order > f) == 0:
-            self._updateFifthOrder()
-        self.fifth_order = np.concatenate([self.fifth_order[1:], [f]])
+            if len(self.fct) > 5 and sum(self.fifth_order > f) == 0:
+                self._updateFifthOrder()
+            self.fifth_order = np.concatenate([self.fifth_order[1:], [f]])
 
     def _updateConstraint(self, g):
         """
@@ -214,8 +216,8 @@ class ActiveElitistES:
 
         if infeasible:
             self.A -= self.beta / np.sum(g > 0) * summ
-            return True
-        pass
+
+        return infeasible
 
     def _updateStepSize(self, lbd):
         """
@@ -223,8 +225,7 @@ class ActiveElitistES:
         p_succ.
         """
         self.p_succ = (1-self.c_p) * self.p_succ + self.c_p * lbd
-        self.sigma *= np.exp(1/self.d * ((self.p_succ - self.p_target)
-                                         / (1 - self.p_target)))
+        self.sigma *= np.exp((self.p_succ - 2.0/11.0) / ((1.0-2.0/11.0)*self.d))
 
     def _updateCholesky(self):
         """
@@ -236,12 +237,11 @@ class ActiveElitistES:
         """
         self.s *= (1-self.c)
         self.s += np.sqrt(self.c * (2-self.c)) * self.A.dot(self.z)
-        w2 = np.linalg.inv(self.A) * self.s
+        w2 = np.linalg.inv(self.A).dot(self.s)
         self.A *= np.sqrt(1 - self.c_cov_plus)
         self.A += np.sqrt(1 - self.c_cov_plus) / np.linalg.norm(w2)**2 \
             * (np.sqrt(1 + self.c_cov_plus * np.linalg.norm(w2)**2
-                       / (1-self.c_cov_plus)) - 1) \
-            * self.s.dot(w2.T)
+                       / (1-self.c_cov_plus)) - 1) * np.outer(self.s, w2)
 
     def _updateFifthOrder(self):
         """
@@ -251,7 +251,6 @@ class ActiveElitistES:
         """
         self.c_cov_minus = np.min([0.4/(self.dim**(1.6) + 1),
                                    1/(2*np.linalg.norm(self.z)**2 - 1)])
-
         self.A *= np.sqrt(1 + self.c_cov_minus)
         self.A += np.sqrt(1 + self.c_cov_minus) / np.linalg.norm(self.z)**2 \
             * (np.sqrt(1 - self.c_cov_minus * np.linalg.norm(self.z)**2
@@ -269,7 +268,7 @@ class ActiveElitistES:
             # Stagnation crit
             print("Stagnation crit")
             return True
-        elif len(self.best) > 2 and self.best[-2] - self.best[-1] < 1e-18:
+        elif len(self.best) > 2 and self.best[-2] - self.best[-1] < 1e-16:
             # TolFun crit
             print("TolFun crit")
             return True
@@ -278,21 +277,47 @@ class ActiveElitistES:
             print("TolX crit")
             return True
 
+    def stopping_criterion(self, f_, g_, minf):
+        g = [np.max([u, 0]) for u in g_]
+        # stop_bool = np.allclose(g_, 0, atol=self.stop_tol["g"])
+        stop_bool = sum(g) == 0
+        stop_bool *= np.allclose(f_, minf, rtol=1e-8)
+        # stop_bool *= np.abs(f_ - minf) < 1e-8
+        self.stop_now = stop_bool
+
+        if self.stagnation > 120 + 30*self.dim:
+            print("Stagnation crit")
+            return True
+        return self.stop_now
+
 
 def fmin_con(f, g, x0, sigma0, options=None):
     """
     Interface for constrained optimization
     """
-    es = ElitistES(x0, sigma0, options)
+    es = ActiveElitistES(x0, sigma0, options)
     while not es.stop():
         x = es.ask()
         es.tell(x, f, g(x))
+    return es.x
+
+
+def fmin_pb(pb, x0, sigma0, options=None):
+    """
+    Interface to stop when abs(f_star - f) < 1e-8
+    """
+    es = ActiveElitistES(x0, sigma0, options)
+    g_ = pb.g(x0)
+    while not es.stopping_criterion(es.fct[-1], g_, pb.solution):
+        x = es.ask()
+        g_ = pb.g(x)
+        es.tell(x, pb.f, g_)
 
     return es.x
 
 
 if __name__ == "__main__":
-    dimension = 5
+    dimension = 10
     x0 = np.ones(dimension) * dimension
     sigma0 = 1
 
@@ -301,7 +326,11 @@ if __name__ == "__main__":
     print(problem)
     print(x)
 
-    problem = SphereLinCons(dimension, 1)
-    x = fmin_con(problem.f, problem.g, x0, 1)
+    problem = SphereLinCons(dimension, int(dimension/2))
+    # problem = TR2()
+    O = ortho_group.rvs(dimension)
+    # x = fmin_con(lambda x: problem.f(O.dot(x)), problem.g, x0, 1)
+    x = fmin_pb(problem, x0, sigma0)
+    # x = fmin_pb(problem, np.ones(2)*10, 1)
     print(problem)
     print(x)
