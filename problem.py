@@ -87,3 +87,40 @@ class TR2:
                 for k in range(self.m):
                     problem_data.append("%s g-%s-evals" % self.count_g[k], k)
         return "\n".join(problem_data)
+
+
+class elli:
+
+    def __init__(self, dimension, nb_constraints=0):
+        self.n = dimension
+        self.m = nb_constraints
+        assert self.n >= self.m
+
+        self.count_f = 0
+        if self.m:
+            self.count_g = np.zeros(self.m, dtype=int)
+
+        self.solution = 2.0
+
+    def __call__(self, x):
+        return self.f(x), self.g(x)
+
+    def f(self, x, cond=1e6):
+        self.count_f += 1
+        N = len(x)
+        return sum(cond**(np.arange(N) / (N - 1.)) * x**2)
+
+    def g(self, x):
+        self.count_g += 1
+        return np.array([1 - x[k] for k in range(self.m)])
+
+    def __str__(self):
+        problem_data = ["elli objective with %s linear constraints" % self.m]
+        problem_data.append("%s f-evals" % self.count_f)
+        if self.m:
+            if np.all(self.count_g == self.count_g[0]):
+                problem_data.append("%s g-evals" % self.count_g[0])
+            else:
+                for k in range(self.m):
+                    problem_data.append("%s g-%s-evals" % self.count_g[k], k)
+        return "\n".join(problem_data)
