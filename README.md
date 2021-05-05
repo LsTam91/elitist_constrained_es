@@ -10,7 +10,6 @@ This is work in progress.
 - A (1+1)-CMA-ES for constrained optimisation (_in progress_)
     - ask-and-tell interface via `ActiveElitistES`
     - direct interface via `fmin_con`
-    - TODO: implement proper stopping criteria for constrained optimization
 - Test problems with display utilities
 
 Everything implemented with Python and NumPy.
