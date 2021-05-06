@@ -1,5 +1,5 @@
 import numpy as np
-from problem import SphereLinCons
+from problem import SphereLinCons  # , elli
 # from scipy.stats import ortho_group
 from nlcco.base import BaseRunner
 # from nlcco.problems import arnold2012, cec2006
@@ -76,12 +76,13 @@ class CholeskyElitistES:
         Update of the cholesky matrix in order to change the search space for
         new candidates
         """
+
         if self.p_succ < self.p_thresh:
             c_a = np.sqrt(1 - self.c_cov)
-            update_coef = c_a / np.linalg.norm(self.z) \
+            update_coef = c_a / np.linalg.norm(self.z)**2 \
                 * (np.sqrt(1 + (1 - c_a**2) * np.linalg.norm(self.z)**2
                            / c_a**2) - 1)
-            self.A *= c_a + update_coef * np.outer(self.z, self.z)
+            self.A = c_a * self.A + update_coef * self.A.dot(np.outer(self.z, self.z))
 
     def stop(self):
         """
@@ -345,6 +346,18 @@ def fmin_con(objective, constraint, x0, sigma0, options=None):
         f = objective(x)
         n_f += 1
         es.tell(x, f)
+    return es
+
+
+def fmin2(f, x0, sigma0, options=None):
+    """
+    Standard interface to unconstrained optimization with ActiveElitistES
+    """
+    es = ActiveElitistES(x0, sigma0, options)
+    while not es.stop():
+        x = es.ask()
+        es.tell(x, f(x))
+
     return es
 
 
