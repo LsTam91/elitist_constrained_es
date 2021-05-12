@@ -1,5 +1,5 @@
 import numpy as np
-from problem import SphereLinCons  # , elli
+from problem import SphereLinCons, elli
 # from scipy.stats import ortho_group
 from nlcco.base import BaseRunner
 # from nlcco.problems import arnold2012, cec2006
@@ -48,10 +48,10 @@ class CholeskyElitistES:
         """
         Update the ES internal model from x and its objective value f(x)
         """
-        lbd = 1 * (f <= self.fct[-1])
+        lbd = f <= self.fct[-1]
         self._updateStepSize(lbd)
 
-        if lbd == 1:
+        if lbd:
             self.x = x
             self.stagnation = 0
             self.fct.append(f)
@@ -165,10 +165,10 @@ class ActiveElitistES:
         """
         Update the ES internal model from x and its objective value f(x)
         """
-        lbd = 1 * (f <= self.fct[-1])
+        lbd = f <= self.fct[-1]
         self._updateStepSize(lbd)
 
-        if lbd == 1:
+        if lbd:
             self.x = x_new
             self.fct.append(f)
             self.best.append(f)
@@ -179,7 +179,8 @@ class ActiveElitistES:
             self.fct.append(self.fct[-1])
             self.stagnation += 1
 
-        if len(self.fct) > 5 and sum(self.fifth_order > f) == 0:
+        # if len(self.fct) > 5 and sum(self.fifth_order > f) == 0:
+        if (not lbd) and self.p_succ < 0.44:
             self._updateFifthOrder()
         self.fifth_order = np.concatenate([self.fifth_order[1:], [f]])
 
@@ -230,14 +231,22 @@ class ActiveElitistES:
         Cholesky decompositionin every iteration of the algorithm, Igel et al.
         presented a direct update of A.
         """
-        self.s *= (1-self.c)
-        self.s += np.sqrt(self.c * (2-self.c)) * self.A.dot(self.z)
-        w2 = np.linalg.inv(self.A).dot(self.s)
+        if self.p_succ < 0.44:
+            self.s *= (1-self.c)
+            self.s += np.sqrt(self.c * (2-self.c)) * self.A.dot(self.z)
+            self.alpha = 1 - self.c_cov_plus
 
-        self.A *= np.sqrt(1 - self.c_cov_plus)
-        self.A += np.sqrt(1 - self.c_cov_plus) / np.linalg.norm(w2)**2 \
-            * (np.sqrt(1 + self.c_cov_plus * np.linalg.norm(w2)**2
-                       / (1-self.c_cov_plus)) - 1) * np.outer(self.s, w2)
+        else:
+            self.s *= 1 - self.c
+            self.alpha = 1 - self.c_cov_plus + self.c_cov_plus * self.c * (2-self.c)
+
+        u = np.linalg.inv(self.A).dot(self.s)
+        u2 = np.linalg.norm(u)**2
+
+        self.A *= np.sqrt(self.alpha)
+        self.A += np.sqrt(self.alpha) * (np.sqrt(1 + self.c_cov_plus * u2
+                                                 / (self.alpha)) - 1) * np.outer(self.s, u) / u2
+
         assert not np.isnan(self.A).any()
 
     def _updateFifthOrder(self):
@@ -248,11 +257,11 @@ class ActiveElitistES:
         """
         self.c_cov_minus = np.min([0.4/(self.dim**(1.6) + 1),
                                    1/abs(2*np.linalg.norm(self.z)**2 - 1)])
+        z2 = np.linalg.norm(self.z)**2
 
         self.A *= np.sqrt(1 + self.c_cov_minus)
-        self.A += np.sqrt(1 + self.c_cov_minus) / np.linalg.norm(self.z)**2 \
-            * (np.sqrt(1 - self.c_cov_minus * np.linalg.norm(self.z)**2
-                       / (1+self.c_cov_minus)) - 1) \
+        self.A += np.sqrt(1 + self.c_cov_minus) / z2 \
+            * (np.sqrt(1 - self.c_cov_minus * z2 / (1+self.c_cov_minus)) - 1) \
             * self.A.dot(np.outer(self.z, self.z))
         assert not np.isnan(self.A).any()
 
@@ -298,18 +307,28 @@ class MyRunner(BaseRunner):
             print("Stagnation criterion is reached before the true minimum")
             return True
         # return np.allclose(f, problem.fmin, rtol=1e-8)
-        return np.abs(f - problem.fmin) < 1e-8
+        return np.abs(f - self.problem.fmin) < 1e-8
 
     def run(self, x0, sigma0):
         self.es = ActiveElitistES(x0, sigma0)
         f = np.inf
+        self.list_sigma = []
+        self.A_norm = []
+        self.Q_vp = []
+        self.list_x = []
         while not self.stop(f):
             while True:
+                # Logger:
+                self.Q_vp.append(np.linalg.eig(self.es.A.dot(self.es.A))[0])
+                self.list_sigma.append(self.es.sigma)
+                self.A_norm.append(np.linalg.norm(self.es.A))
+                self.list_x.append(self.es.x)
+
                 x = self.es.ask()
                 g = self.g_b(x)
                 is_feasible = self.es.test(g)
 
-                if self.countg % 1000 == 0:
+                if self.countg % 5000 == 0:
                     print("{0} evaluation of f and {1} of the constraint."
                           .format(self.countf, self.countg))
 
