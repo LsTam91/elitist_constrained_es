@@ -77,6 +77,12 @@ class TR2:
         self.count_g += 1
         return np.array([2 - x[0] - x[1]])
 
+    def df(self, x):
+        return np.array([2*x[0], 2*x[1]])
+
+    def dg(self, x):
+        return - np.ones(2)
+
     def __str__(self):
         problem_data = ["2D Sphere objective with %s linear constraints" % self.m]
         problem_data.append("%s f-evals" % self.count_f)

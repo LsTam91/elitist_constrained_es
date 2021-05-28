@@ -102,14 +102,20 @@ class CholeskyElitistES:
             return True
 
 
-def fmin(f, x0, sigma0, options=None):
+def fmin(f, x0, sigma0, options=False):
     """
     Standard interface to unconstrained optimization
     """
     es = CholeskyElitistES(x0, sigma0, options)
+    sig_list = []
+    vp_list = []
     while not es.stop():
         x = es.ask()
         es.tell(x, f(x))
+        vp_list.append(np.linalg.eig(es.A.dot(es.A))[0])
+        sig_list.append(es.sigma)
+    if options:
+        return es, vp_list, sig_list
 
     return es
 
@@ -319,7 +325,7 @@ class MyRunner(BaseRunner):
         while not self.stop(f):
             while True:
                 # Logger:
-                self.Q_vp.append(np.linalg.eig(self.es.A.dot(self.es.A))[0])
+                self.Q_vp.append(np.linalg.eig(self.es.A.T.dot(self.es.A))[0])
                 self.list_sigma.append(self.es.sigma)
                 self.A_norm.append(np.linalg.norm(self.es.A))
                 self.list_x.append(self.es.x)
@@ -342,7 +348,7 @@ class MyRunner(BaseRunner):
         print("The minimizer is:", self.es.x)
 
 
-def fmin_con(objective, constraint, x0, sigma0, options=None):
+def fmin_con(objective, constraint, x0, sigma0, options=True):
     """
     Interface for constrained optimization
     """
@@ -356,7 +362,7 @@ def fmin_con(objective, constraint, x0, sigma0, options=None):
             n_g += 1
             is_feasible = es.test(g)
 
-            if n_g % 500 == 0:
+            if n_g % 500 == 0 and options:
                 print("{0} evaluation of f and {1} of the constraint."
                       .format(n_f, n_g))
 

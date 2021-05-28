@@ -1,12 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from elitist_es import MyRunner, ActiveElitistES
-# from problem import SphereLinCons, elli
+from elitist_es import MyRunner, ActiveElitistES, fmin
+from problem import SphereLinCons, elli
 # from scipy.stats import ortho_group
-
 # Import the following package from https://github.com/paulduf/benchmarking_nlco.git
 from nlcco.base import BaseRunner
-from nlcco.problems import arnold2012, cec2006
+from nlcco.problems import arnold2012, LinConsQP
 
 
 def plot_logger(runner, xopt, name):
@@ -21,7 +20,6 @@ def plot_logger(runner, xopt, name):
     ax[0, 0].set_title("Evolution of the step size sigma")
     ax[0, 0].grid(True, which="both")
 
-    # ax[0, 1].semilogy(runner.A_norm)
     diff = np.abs(runner.list_x - np.array(xopt))
     for i in range(runner.es.dim):
         ax[0, 1].semilogy(diff[:, i], label=i)
@@ -38,7 +36,7 @@ def plot_logger(runner, xopt, name):
 
     vp = np.array([np.sort(np.abs(u)) for u in runner.Q_vp])
     for i in range(runner.es.dim):
-        ax[1, 1].semilogy(vp[:, i], label=i)
+        ax[1, 1].semilogy(np.sqrt(vp[:, i]), label=i)
         ax[1, 1].set_title("Evolution of the eigenvalues of the covariance matrix, C")
         ax[1, 1].legend()
     ax[1, 1].grid(True, which="both")
@@ -61,7 +59,34 @@ def runs(problems, sigma0=1):
         plot_logger(runner, problem.xopt, pb)
 
 
+def plot_simple(vp, sig):
+    fig, ax = plt.subplots(1, 2, figsize=(16, 6))
+
+    ax[0].semilogy(sig)
+    ax[0].set_title("Evolution of the step size sigma")
+    ax[0].grid(True, which="both")
+
+    vp = np.array([np.sort(np.abs(u)) for u in vp])
+    for i in range(len(vp[0])):
+        ax[1].semilogy(np.sqrt(vp[:, i]), label=i)
+        ax[1].set_title("Evolution of the eigenvalues of the covariance matrix, C")
+        ax[1].legend()
+    ax[1].grid(True, which="both")
+
+    plt.show()
+
+
 if __name__ == '__main__':
     runs(arnold2012)
 
+# %%
 
+dimension = 5
+x0 = np.ones(dimension) * dimension
+sigma0 = 1
+
+problem = elli(dimension, 0)
+es, vp, sigmas = fmin(problem.f, x0, sigma0, options=True)
+plot_simple(vp, sigmas)
+print(problem)
+print(es.x)
