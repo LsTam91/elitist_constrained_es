@@ -151,9 +151,10 @@ class ActiveElitistES:
         self.fifth_order = np.ones(5) * np.inf
         self.s = 0
 
-        # Parameters for stopping criterium :
+        # Parameters for stopping criterion :
         self.tolsig = 1e-12
         self.stagnation = 0
+        self.tolstagnation = 120 + 30 * self.dim
         self.best = []
         self.TolX = 1e-12 * sigma0
 
@@ -278,7 +279,7 @@ class ActiveElitistES:
         if self.sigma < self.tolsig:
             print("sigma")
             return True
-        elif self.stagnation > 120 + 30*self.dim:
+        elif self.stagnation > self.tolstagnation:
             # Stagnation crit
             print("Stagnation crit")
             return True
@@ -297,7 +298,7 @@ class ActiveElitistES:
         stop_bool *= np.allclose(f_, minf, rtol=1e-8)
         self.stop_now = stop_bool
 
-        if self.stagnation > 120 + 30*self.dim:
+        if self.stagnation > self.tolstagnation:
             print("Stagnation criterion is reached before the true minimum")
             return True
         return self.stop_now
