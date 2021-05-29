@@ -1,5 +1,5 @@
 import numpy as np
-from problem import SphereLinCons, elli
+from problem import LinConsQP
 # from scipy.stats import ortho_group
 from nlcco.base import BaseRunner
 # from nlcco.problems import arnold2012, cec2006
@@ -291,17 +291,6 @@ class ActiveElitistES:
             # TolX crit
             print("TolX crit")
             return True
-
-    def stopping_criterion(self, f_, g_, minf):
-        g = [np.max([u, 0]) for u in g_]
-        stop_bool = sum(g) == 0
-        stop_bool *= np.allclose(f_, minf, rtol=1e-8)
-        self.stop_now = stop_bool
-
-        if self.stagnation > self.tolstagnation:
-            print("Stagnation criterion is reached before the true minimum")
-            return True
-        return self.stop_now
 
 
 class MyRunner(BaseRunner):
