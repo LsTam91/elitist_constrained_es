@@ -230,6 +230,7 @@ class ActiveElitistES:
                 print("ERROR: NaN values in the covariance matrix")
                 print(f"After {self.count_g} constraint evaluations")
                 print(f"summ value: {summ}")
+                raise RuntimeError("NaN values in the covariance matrix")
 
         self.count_g += 1
 
@@ -291,26 +292,28 @@ class ActiveElitistES:
             * self.A.dot(np.outer(self.z, self.z))
         assert not np.isnan(self.A).any()
 
-    def stop(self):
+    def stop(self, inner=False):
         """
         Stopping criteria
+        Set inner to true to test only for criteria related to the inner loop
         """
-        if self.sigma < self.tolsig:
-            print("sigma")
-            return True
-        elif self.stagnation > self.tolstagnation:
-            # Stagnation crit
-            print("Stagnation crit")
-            return True
-        elif len(self.best) > 2 and self.best[-2] - self.best[-1] < self.tolfun:
-            # TolFun crit
-            print("TolFun crit")
-            return True
-        elif self.sigma * self.p_succ < self.TolX:
-            # TolX crit
-            print("TolX crit")
-            return True
-        elif self.count_f >= self.tolcountf or self.count_g > self.tolcountg:
+        if not inner:
+            if self.sigma < self.tolsig:
+                print("sigma")
+                return True
+            elif self.stagnation > self.tolstagnation:
+                # Stagnation crit
+                print("Stagnation crit")
+                return True
+            elif len(self.best) > 2 and self.best[-2] - self.best[-1] < self.tolfun:
+                # TolFun crit
+                print("TolFun crit")
+                return True
+            elif self.sigma * self.p_succ < self.TolX:
+                # TolX crit
+                print("TolX crit")
+                return True
+        if self.count_f >= self.tolcountf or self.count_g > self.tolcountg:
             print("Number of evals exceeded")
             return True
         return False
