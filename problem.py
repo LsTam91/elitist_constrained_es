@@ -110,3 +110,21 @@ problem_infos = {
     2: {"name": "Ellipsoid", "fun": elli},
     3: {"name": "Rotated Ellipsoid", "fun": ellirot}
 }
+
+
+if __name__ == "__main__":
+    from elitist_es import fmin, fmin_con
+    dimension = 5
+    m = int(dimension / 2)
+    x0 = np.ones(dimension) * dimension
+    sigma0 = 1
+
+    problem = LinConsQP(dimension, 0, 0)
+    es = fmin(problem.f, x0, sigma0)
+    print(problem)
+    print(es.x)
+
+    problem = LinConsQP(dimension, m, 0)
+    es = fmin_con(problem.f, problem.g, x0, sigma0)
+    print(problem)
+    print(es.x)

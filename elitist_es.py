@@ -1,8 +1,4 @@
 import numpy as np
-from problem import LinConsQP
-# from scipy.stats import ortho_group
-from nlcco.base import BaseRunner
-# from nlcco.problems import arnold2012, cec2006
 
 
 class CholeskyElitistES:
@@ -128,6 +124,8 @@ class ActiveElitistES:
     """
 
     def __init__(self, x0, sigma0, options=None):
+
+        # Optimization variables
         self.x = x0
         self.sigma = sigma0
         self.dim = len(x0)
@@ -137,26 +135,33 @@ class ActiveElitistES:
         self.v = np.array([])
         self.w = np.array([])
 
+        # Solver variables
+        self.count_f = 0
+        self.count_g = 0
+
         # Parameter settings
-        self.d = 1 + self.dim/2  # controls the rate of the step size adaptation
-        self.c = 2/(self.dim+2)
-        self.c_p = 1/12  # learning rate of the average success
-        self.p_target = 2/11  # target succes rate
-        self.c_cov_plus = 2/(self.dim**2 + 6)
-        self.c_c = 1/(self.dim+2)
-        self.beta = 0.1/(self.dim+2)
+        self.d = 1 + self.dim / 2  # controls the rate of the step size adaptation
+        self.c = 2 / (self.dim + 2)
+        self.c_p = 1 / 12  # learning rate of the average success
+        self.p_target = 2 / 11  # target succes rate
+        self.c_cov_plus = 2 / (self.dim**2 + 6)
+        self.c_c = 1 / (self.dim + 2)
+        self.beta = 0.1 / (self.dim + 2)
 
         # Variable:
-        self.p_succ = 2/11  # p_target
+        self.p_succ = 2 / 11  # p_target
         self.fifth_order = np.ones(5) * np.inf
         self.s = 0
 
         # Parameters for stopping criterion :
-        self.tolsig = 1e-12
+        self.tolsig = 1e-10
+        self.tolfun = 1e-9
         self.stagnation = 0
         self.tolstagnation = 120 + 30 * self.dim
         self.best = []
-        self.TolX = 1e-12 * sigma0
+        self.TolX = 1e-10 * sigma0
+        self.tolcountf = np.inf
+        self.tolcountg = np.inf
 
         self.stop_now = False
 
@@ -191,6 +196,8 @@ class ActiveElitistES:
             self._updateFifthOrder()
         self.fifth_order = np.concatenate([self.fifth_order[1:], [f]])
 
+        self.count_f += 1
+
     def test(self, g):
         """
         If the solution isn't feasible we update the cholesky matrix, A and the
@@ -212,14 +219,20 @@ class ActiveElitistES:
 
         for j in range(m):
             if g[j] > 0:
-                self.v[j] *= (1-self.c_c)
+                self.v[j] *= (1 - self.c_c)
                 self.v[j] += self.c_c * self.A.dot(self.z)
                 self.w[j] = inv_A.dot(self.v[j])
                 summ += np.outer(self.v[j], self.w[j]) / self.w[j].T.dot(self.w[j])
 
         if not feasible:
             self.A -= self.beta / np.sum([u > 0 for u in g]) * summ
-            assert not np.isnan(self.A).any()
+            if np.isnan(self.A).any():
+                print("ERROR: NaN values in the covariance matrix")
+                print(f"After {self.count_g} constraint evaluations")
+                print(f"summ value: {summ}")
+
+        self.count_g += 1
+
         return feasible
 
     def _updateStepSize(self, lbd):
@@ -227,8 +240,10 @@ class ActiveElitistES:
         Update the value of the step size sigma and the averaged success rate,
         p_succ.
         """
-        self.p_succ = (1-self.c_p) * self.p_succ + self.c_p * lbd
-        self.sigma *= np.exp((self.p_succ - 2.0/11.0) / ((1.0-2.0/11.0)*self.d))
+        self.p_succ = (1 - self.c_p) * self.p_succ + self.c_p * lbd
+        self.sigma *= np.exp(
+            (self.p_succ - self.p_target) / ((1 - self.p_target) * self.d)
+        )
 
     def _updateCholesky(self):
         """
@@ -239,13 +254,13 @@ class ActiveElitistES:
         presented a direct update of A.
         """
         if self.p_succ < 0.44:
-            self.s *= (1-self.c)
-            self.s += np.sqrt(self.c * (2-self.c)) * self.A.dot(self.z)
+            self.s *= (1 - self.c)
+            self.s += np.sqrt(self.c * (2 - self.c)) * self.A.dot(self.z)
             self.alpha = 1 - self.c_cov_plus
 
         else:
             self.s *= 1 - self.c
-            self.alpha = 1 - self.c_cov_plus + self.c_cov_plus * self.c * (2-self.c)
+            self.alpha = 1 - self.c_cov_plus + self.c_cov_plus * self.c * (2 - self.c)
 
         u = np.linalg.inv(self.A).dot(self.s)
         u2 = np.linalg.norm(u)**2
@@ -262,13 +277,17 @@ class ActiveElitistES:
         incorporate the active covariance matrix update due to Jastrebski and
         Arnold.
         """
-        self.c_cov_minus = np.min([0.4/(self.dim**(1.6) + 1),
-                                   1/abs(2*np.linalg.norm(self.z)**2 - 1)])
+        self.c_cov_minus = np.min(
+            [
+                0.4 / (self.dim**(1.6) + 1),
+                1 / abs(2 * np.linalg.norm(self.z)**2 - 1)
+            ]
+        )
         z2 = np.linalg.norm(self.z)**2
 
         self.A *= np.sqrt(1 + self.c_cov_minus)
         self.A += np.sqrt(1 + self.c_cov_minus) / z2 \
-            * (np.sqrt(1 - self.c_cov_minus * z2 / (1+self.c_cov_minus)) - 1) \
+            * (np.sqrt(1 - self.c_cov_minus * z2 / (1 + self.c_cov_minus)) - 1) \
             * self.A.dot(np.outer(self.z, self.z))
         assert not np.isnan(self.A).any()
 
@@ -283,7 +302,7 @@ class ActiveElitistES:
             # Stagnation crit
             print("Stagnation crit")
             return True
-        elif len(self.best) > 2 and self.best[-2] - self.best[-1] < 1e-16:
+        elif len(self.best) > 2 and self.best[-2] - self.best[-1] < self.tolfun:
             # TolFun crit
             print("TolFun crit")
             return True
@@ -291,51 +310,10 @@ class ActiveElitistES:
             # TolX crit
             print("TolX crit")
             return True
-
-
-class MyRunner(BaseRunner):
-
-    def g_b(self, x):
-        return np.concatenate([self.constraint(x), self.problem.g_bounds(x)])
-
-    def stop(self, f):
-        if self.es.stagnation > 120 + 30*self.es.dim:
-            print("Stagnation criterion is reached before the true minimum")
+        elif self.count_f >= self.tolcountf or self.count_g > self.tolcountg:
+            print("Number of evals exceeded")
             return True
-        # return np.allclose(f, problem.fmin, rtol=1e-8)
-        return np.abs(f - self.problem.fmin) < 1e-8
-
-    def run(self, x0, sigma0):
-        self.es = ActiveElitistES(x0, sigma0)
-        f = np.inf
-        self.list_sigma = []
-        self.A_norm = []
-        self.Q_vp = []
-        self.list_x = []
-        while not self.stop(f):
-            while True:
-                # Logger:
-                self.Q_vp.append(np.linalg.eig(self.es.A.T.dot(self.es.A))[0])
-                self.list_sigma.append(self.es.sigma)
-                self.A_norm.append(np.linalg.norm(self.es.A))
-                self.list_x.append(self.es.x)
-
-                x = self.es.ask()
-                g = self.g_b(x)
-                is_feasible = self.es.test(g)
-
-                if self.countg % 5000 == 0:
-                    print("{0} evaluation of f and {1} of the constraint."
-                          .format(self.countf, self.countg))
-
-                if is_feasible:
-                    break
-            f = self.objective(x)
-            self.es.tell(x, f)
-
-        print("We obtain f={0} after {1} evaluation of f and {2} of g."
-              .format(self.es.fct[-1], self.countf, self.countg))
-        print("The minimizer is:", self.es.x)
+        return False
 
 
 def fmin_con(objective, constraint, x0, sigma0, options=True):
@@ -375,19 +353,3 @@ def fmin2(f, x0, sigma0, options=None):
 
     return es
 
-
-if __name__ == "__main__":
-    dimension = 5
-    m = int(dimension/2)
-    x0 = np.ones(dimension) * dimension
-    sigma0 = 1
-
-    problem = SphereLinCons(dimension, 0)
-    es = fmin(problem.f, x0, sigma0)
-    print(problem)
-    print(es.x)
-
-    problem = SphereLinCons(dimension, m)
-    es = fmin_con(problem.f, problem.g, x0, sigma0)
-    print(problem)
-    print(es.x)
