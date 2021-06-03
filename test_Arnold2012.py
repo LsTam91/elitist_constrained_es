@@ -1,11 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from elitist_es import MyRunner, ActiveElitistES, fmin
-from problem import SphereLinCons, elli
+from elitist_es import MyRunner, fmin_con, fmin
+from problem import LinConsQP
 # from scipy.stats import ortho_group
 # Import the following package from https://github.com/paulduf/benchmarking_nlco.git
-from nlcco.base import BaseRunner
-from nlcco.problems import arnold2012, LinConsQP
+from nlcco.problems import arnold2012
 
 
 def plot_logger(runner, xopt, name):
@@ -15,31 +14,39 @@ def plot_logger(runner, xopt, name):
     fig, ax = plt.subplots(2, 2, figsize=(16, 8))
     plt.subplots_adjust(hspace=0.3)
 
-    ax[0, 0].semilogy(runner.list_sigma)
-    # ax[0, 0].semilogy(runner.A_norm)
-    ax[0, 0].set_title("Evolution of the step size sigma")
+    ax[0, 0].semilogy(runner.list_sigma, label='sigma')
+    f = np.array(runner.fct)
+    f -= np.min(f)
+    f += 10**(-12)
+    ax[0, 0].semilogy(f, label='f - min(f)')
+    ax[0, 0].legend()
+    ax[0, 0].set_title("Evolution of the step size sigma and f - min(f)")
     ax[0, 0].grid(True, which="both")
+    ax[0, 0].set_xlabel("g-evals")
 
     diff = np.abs(runner.list_x - np.array(xopt))
     for i in range(runner.es.dim):
         ax[0, 1].semilogy(diff[:, i], label=i)
-        ax[0, 1].set_title("abs(x-x_opt)")
-        ax[0, 1].grid(True, which="both")
-        ax[0, 1].legend()
+    ax[0, 1].set_title("abs(x-x_opt)")
+    ax[0, 1].grid(True, which="both")
+    ax[0, 1].legend()
+    ax[0, 1].set_xlabel("f-evals")
 
-    f = np.array(runner.es.fct)
-    f -= np.min(f)
-    f += 10**(-12)
-    ax[1, 0].semilogy(f)
-    ax[1, 0].set_title("f - min(f)")
+    std = np.array([np.sort(np.abs(u)) for u in runner.std])
+    for i in range(runner.es.dim):
+        ax[1, 0].plot(np.sqrt(std[:, i])*runner.list_sigma, label=i)
+    ax[1, 0].legend()
+    ax[1, 0].set_title("Standard deviations times sigma")
     ax[1, 0].grid(True, which="both")
+    ax[1, 0].set_xlabel("g-evals")
 
     vp = np.array([np.sort(np.abs(u)) for u in runner.Q_vp])
     for i in range(runner.es.dim):
         ax[1, 1].semilogy(np.sqrt(vp[:, i]), label=i)
-        ax[1, 1].set_title("Evolution of the eigenvalues of the covariance matrix, C")
-        ax[1, 1].legend()
+    ax[1, 1].set_title("Evolution of the eigenvalues of the covariance matrix, C")
+    ax[1, 1].legend()
     ax[1, 1].grid(True, which="both")
+    ax[1, 1].set_xlabel("g-evals")
 
     fig.suptitle('Problem ' + name, fontsize=14)
     plt.show()
@@ -47,8 +54,7 @@ def plot_logger(runner, xopt, name):
 
 def runs(problems, sigma0=1):
     for pb in problems:
-        if pb == 'TR2':
-            break
+
         print("Problem name:", pb)
         problem = arnold2012[pb]["obj"]()
         runner = MyRunner(problem)
@@ -59,34 +65,52 @@ def runs(problems, sigma0=1):
         plot_logger(runner, problem.xopt, pb)
 
 
-def plot_simple(vp, sig):
-    fig, ax = plt.subplots(1, 2, figsize=(16, 6))
+def plot_simple(n=5, m=3, index=1):
+    pb = LinConsQP(n, m, index)
+    x0 = np.ones(n)*n
+    if m > 0:
+        es, vps, sig, stds, x = fmin_con(pb.f, pb.g, x0, 1, plot=True)
+    else:
+        es, vps, sig, stds, x = fmin(pb.f, x0, 1, plot=True)
 
-    ax[0].semilogy(sig)
-    ax[0].set_title("Evolution of the step size sigma")
-    ax[0].grid(True, which="both")
+    fig, ax = plt.subplots(2, 2, figsize=(16, 8))
 
-    vp = np.array([np.sort(np.abs(u)) for u in vp])
-    for i in range(len(vp[0])):
-        ax[1].semilogy(np.sqrt(vp[:, i]), label=i)
-        ax[1].set_title("Evolution of the eigenvalues of the covariance matrix, C")
-        ax[1].legend()
-    ax[1].grid(True, which="both")
+    ax[0, 0].semilogy(sig)
+    ax[0, 0].set_title("Evolution of the step size sigma")
+    ax[0, 0].grid(True, which="both")
 
+    diff = np.abs(x - np.array(pb.xopt))
+    for i in range(n):
+        ax[0, 1].semilogy(diff[:, i], label=i)
+    ax[0, 1].set_title("abs(x-x_opt)")
+    ax[0, 1].grid(True, which="both")
+    ax[0, 1].legend()
+    ax[0, 1].set_xlabel("f-evals")
+
+    std = np.array([np.sort(np.abs(u)) for u in stds])
+    for i in range(n):
+        ax[1, 0].plot(np.sqrt(std[:, i])*sig, label=i)
+    ax[1, 0].legend()
+    ax[1, 0].set_title("Standard deviations times sigma")
+    ax[1, 0].grid(True, which="both")
+    ax[1, 0].set_xlabel("g-evals")
+
+    vp = np.array([np.sort(np.abs(u)) for u in vps])
+    for i in range(n):
+        ax[1, 1].semilogy(np.sqrt(vp[:, i]), label=i)
+        ax[1, 1].set_title("Evolution of the eigenvalues of the covariance matrix, C")
+        ax[1, 1].legend()
+    ax[1, 1].grid(True, which="both")
+
+    name = ["Linear", "Sphere", "Elli", "Rotated Ellipsoid"]
+    fig.suptitle(f'Problem {name[index]} in dimension {n} with {m} constraints', fontsize=14)
     plt.show()
 
 
 if __name__ == '__main__':
     runs(arnold2012)
+    plot_simple(5, 5, 0)
 
-# %%
-
-dimension = 5
-x0 = np.ones(dimension) * dimension
-sigma0 = 1
-
-problem = elli(dimension, 0)
-es, vp, sigmas = fmin(problem.f, x0, sigma0, options=True)
-plot_simple(vp, sigmas)
-print(problem)
-print(es.x)
+    for j in range(1, 3):
+        for i in [5, 10]:
+            plot_simple(i, int(i/2), j)

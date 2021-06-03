@@ -26,7 +26,7 @@ class LinConsQP:
 
     Remarks:
         - If m == 0 then the constraint function (hence also the call method) returns None
-        - For the rotated ellipsoid x_opt and fmin are not none
+        - For the rotated ellipsoid xopt and fmin are not none
     print(problem) for counter infos
     """
 
@@ -43,10 +43,10 @@ class LinConsQP:
             self.count_g = np.zeros(self.m, dtype=int)
 
         if self.problem_index < 3:
-            self.x_opt = np.array([1] * self.m + [0] * (self.n - self.m))
-            self.f_min = self.objective(self.x_opt)
+            self.xopt = np.array([1] * self.m + [0] * (self.n - self.m))
+            self.f_min = self.objective(self.xopt)
         else:
-            self.x_opt = None
+            self.xopt = None
 
     def __call__(self, x):
         return self.f(x), self.g(x)
@@ -82,7 +82,7 @@ class LinConsQP:
 
 @arrayize
 def linear(x):
-    return - sum(x)
+    return sum(x)
 
 
 @arrayize
