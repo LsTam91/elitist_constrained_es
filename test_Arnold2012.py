@@ -75,10 +75,12 @@ def plot_simple(n=5, m=3, index=1):
         es, vps, sig, stds, x = fmin(pb.f, x0, 1, plot=True)
 
     fig, ax = plt.subplots(2, 2, figsize=(16, 8))
+    plt.subplots_adjust(hspace=0.3)
 
     ax[0, 0].semilogy(sig)
     ax[0, 0].set_title("Evolution of the step size sigma")
     ax[0, 0].grid(True, which="both")
+    ax[0, 0].set_xlabel("g-evals")
 
     diff = np.abs(x - np.array(pb.xopt))
     for i in range(n):
@@ -102,6 +104,7 @@ def plot_simple(n=5, m=3, index=1):
         ax[1, 1].set_title("Evolution of the eigenvalues of the covariance matrix, C")
         ax[1, 1].legend()
     ax[1, 1].grid(True, which="both")
+    ax[1, 1].set_xlabel("g-evals")
 
     name = ["Linear", "Sphere", "Elli", "Rotated Ellipsoid"]
     fig.suptitle(f'Problem {name[index]} in dimension {n} with {m} constraints', fontsize=14)
@@ -109,7 +112,7 @@ def plot_simple(n=5, m=3, index=1):
 
 
 if __name__ == '__main__':
-    runs(arnold2012)
+    # runs(arnold2012)
     plot_simple(5, 5, 0)
 
     for j in range(1, 3):
