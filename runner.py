@@ -24,16 +24,17 @@ class MyRunner(BaseRunner):
         self.es = ActiveElitistES(x0, sigma0)
         f = np.inf
         self.list_sigma = []
-        self.A_norm = []
+        self.std = []
         self.Q_vp = []
         self.list_x = []
+        self.fct = []
         while not self.stop(f):
             while True:
                 # Logger:
                 self.Q_vp.append(np.linalg.eig(self.es.A.T.dot(self.es.A))[0])
                 self.list_sigma.append(self.es.sigma)
-                self.A_norm.append(np.linalg.norm(self.es.A))
-                self.list_x.append(self.es.x)
+                self.std.append(np.diag(self.es.A.T.dot(self.es.A)))
+                self.fct.append(self.es.fct[-1])
 
                 x = self.es.ask()
                 g = self.g_b(x)
@@ -45,6 +46,7 @@ class MyRunner(BaseRunner):
 
                 if is_feasible:
                     break
+            self.list_x.append(self.es.x)
             f = self.objective(x)
             self.es.tell(x, f)
 

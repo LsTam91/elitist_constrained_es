@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from elitist_es import MyRunner, fmin_con, fmin
+from runner import MyRunner
+from elitist_es import fmin_con, fmin
 from problem import LinConsQP
 # from scipy.stats import ortho_group
 # Import the following package from https://github.com/paulduf/benchmarking_nlco.git

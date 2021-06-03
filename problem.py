@@ -119,12 +119,12 @@ if __name__ == "__main__":
     x0 = np.ones(dimension) * dimension
     sigma0 = 1
 
-    problem = LinConsQP(dimension, 0, 0)
+    problem = LinConsQP(dimension, 0, 1)
     es = fmin(problem.f, x0, sigma0)
     print(problem)
     print(es.x)
 
-    problem = LinConsQP(dimension, m, 0)
+    problem = LinConsQP(dimension, m, 1)
     es = fmin_con(problem.f, problem.g, x0, sigma0)
     print(problem)
     print(es.x)

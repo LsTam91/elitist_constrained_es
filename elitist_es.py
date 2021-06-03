@@ -98,20 +98,24 @@ class CholeskyElitistES:
             return True
 
 
-def fmin(f, x0, sigma0, options=False):
+def fmin(f, x0, sigma0, options=False, plot=False):
     """
     Standard interface to unconstrained optimization
     """
-    es = CholeskyElitistES(x0, sigma0, options)
-    sig_list = []
-    vp_list = []
+    es = CholeskyElitistES(x0, sigma0)
+    sig = []
+    vp = []
+    std = []
+    xs = []
     while not es.stop():
         x = es.ask()
         es.tell(x, f(x))
-        vp_list.append(np.linalg.eig(es.A.dot(es.A))[0])
-        sig_list.append(es.sigma)
-    if options:
-        return es, vp_list, sig_list
+        vp.append(np.linalg.eig(es.A.T.dot(es.A))[0])
+        sig.append(es.sigma)
+        std.append(np.diag(es.A.dot(es.A)))
+        xs.append(es.x)
+    if plot:
+        return es, vp, sig, std, xs
 
     return es
 
@@ -319,13 +323,17 @@ class ActiveElitistES:
         return False
 
 
-def fmin_con(objective, constraint, x0, sigma0, options=True):
+def fmin_con(objective, constraint, x0, sigma0, options=True, plot=False):
     """
     Interface for constrained optimization
     """
     n_f = 0
     n_g = 0
     es = ActiveElitistES(x0, sigma0, options)
+    sig = []
+    vp = []
+    std = []
+    xs = []
     while not es.stop():
         while True:
             x = es.ask()
@@ -333,15 +341,23 @@ def fmin_con(objective, constraint, x0, sigma0, options=True):
             n_g += 1
             is_feasible = es.test(g)
 
-            if n_g % 500 == 0 and options:
+            # To plot latter
+            vp.append(np.linalg.eig(es.A.T.dot(es.A))[0])
+            sig.append(es.sigma)
+            std.append(np.diag(es.A.dot(es.A)))
+
+            if n_g % 1500 == 0 and options:
                 print("{0} evaluation of f and {1} of the constraint."
                       .format(n_f, n_g))
 
             if is_feasible:
                 break
+        xs.append(es.x)
         f = objective(x)
         n_f += 1
         es.tell(x, f)
+    if plot:
+        return es, vp, sig, std, xs
     return es
 
 
@@ -355,4 +371,3 @@ def fmin2(f, x0, sigma0, options=None):
         es.tell(x, f(x))
 
     return es
-
