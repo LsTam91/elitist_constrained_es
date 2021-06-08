@@ -274,7 +274,8 @@ class ActiveElitistES:
         self.A += np.sqrt(self.alpha) * (np.sqrt(1 + self.c_cov_plus * u2
                                                  / (self.alpha)) - 1) * np.outer(self.s, u) / u2
 
-        assert not np.isnan(self.A).any()
+        if np.isnan(self.A).any():
+            raise RuntimeError
 
     def _updateFifthOrder(self):
         """
