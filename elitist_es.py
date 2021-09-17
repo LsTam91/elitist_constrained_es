@@ -127,7 +127,9 @@ class ActiveElitistES:
     by D. V. Arnold, and N. Hansen.
     """
 
-    def __init__(self, x0, sigma0, options=None):
+    def __init__(self, x0, sigma0, options=None,
+                 tolsig=1e-10, tolfun=1e-9, TolX=1e-10
+                 ):
 
         # Optimization variables
         self.x = x0
@@ -158,12 +160,12 @@ class ActiveElitistES:
         self.s = 0
 
         # Parameters for stopping criterion :
-        self.tolsig = 1e-10
-        self.tolfun = 1e-9
+        self.tolsig = tolsig
+        self.tolfun = tolfun
         self.stagnation = 0
         self.tolstagnation = 120 + 30 * self.dim
         self.best = []
-        self.TolX = 1e-10 * sigma0
+        self.TolX = TolX * sigma0
         self.tolcountf = np.inf
         self.tolcountg = np.inf
 
@@ -214,6 +216,7 @@ class ActiveElitistES:
         # Init
         if self.v.shape == (0,):
             self.v = np.zeros((m, self.dim))
+        if self.w.shape == (0,):
             self.w = np.zeros((m, self.dim))
 
         # We take the inverse of A only if the solution is infeasible
@@ -267,6 +270,7 @@ class ActiveElitistES:
             self.s *= 1 - self.c
             self.alpha = 1 - self.c_cov_plus + self.c_cov_plus * self.c * (2 - self.c)
 
+        # if all(z == 0)
         u = np.linalg.inv(self.A).dot(self.s)
         u2 = np.linalg.norm(u)**2
 
