@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
 from runner import MyRunner
-from elitist_es import fmin_con, fmin, ActiveElitistES
+from elitist_es_fast import fmin_con, fmin, FastActiveElitistES
 from problem import LinConsQP
 # from scipy.stats import ortho_group
 # Import the following package from https://github.com/paulduf/benchmarking_nlco.git
@@ -93,7 +93,7 @@ def plot_simple(n=5, m=3, index=1):
     ax[0, 1].legend()
     ax[0, 1].set_xlabel("f-evals")
 
-    std = np.array([np.abs(u) for u in stds]) # not sort
+    std = np.array([np.abs(u) for u in stds])  # not sort
     for i in range(n):
         ax[1, 0].plot(np.sqrt(std[:, i])*sig, label=i)
     ax[1, 0].legend()
@@ -118,15 +118,15 @@ def plot_simple(n=5, m=3, index=1):
 
 if __name__ == '__main__':
     # runs(arnold2012)
-    es, vps, sig, stds, x = plot_simple(6, 6, 2)
-    pb = LinConsQP(6, 6, 2)
-    print(pb.f(x[-1]), x[-1])
+    es, vps, sig, stds, x = plot_simple(5, 1, 1)
+    # pb = LinConsQP(6, 6, 2)
+    # print(pb.f(x[-1]), x[-1])
     # for j in range(1, 3):
     #     for i in [5, 10]:
     #         plot_simple(i, int(i/2), j)
 
 # %%
-rcParams.update({"font.size": 14})
+# rcParams.update({"font.size": 14})
 n = 5
 m = 3
 pb = LinConsQP(n, m, 2)
@@ -139,7 +139,7 @@ options = True
 n_f = 0
 n_g = 0
 gvals = []
-es = ActiveElitistES(x0, 1, options)
+es = FastActiveElitistES(x0, 1, options)
 
 if False:
     es.c_c = 0
@@ -151,7 +151,7 @@ vps = []
 stds = []
 xs = [x0]
 xg = [x0]
-f_vals = [objective(x)]
+f_vals = [objective(x0)]
 feasible_sampled = [0]
 # while not es.stop():
 while sum(np.abs(xs[-1] - x_opt)) > 1e-5 and n_g < 30000:
