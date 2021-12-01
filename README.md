@@ -1,7 +1,5 @@
 # Python implementation for the (1+1)-CMA ES
 
-This is work in progress.
-
 ## In this repository:
 
 - A Computational Efficient (1+1)-CMA-ES
