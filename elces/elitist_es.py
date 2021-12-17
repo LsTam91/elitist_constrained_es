@@ -113,8 +113,8 @@ class CholeskyElitistES(BaseES):
         p_succ.
         """
         self.p_succ = (1 - self.c_p) * self.p_succ + self.c_p * lbd
-        self.sigma *= np.exp(1/self.d * ((self.p_succ - self.p_target_succ)
-                                         / (1 - self.p_target_succ)))
+        self.sigma *= np.exp(1 / self.d * ((self.p_succ - self.p_target_succ)
+                                           / (1 - self.p_target_succ)))
 
     def _updateCholesky(self):
         """
@@ -127,7 +127,8 @@ class CholeskyElitistES(BaseES):
             update_coef = c_a / np.linalg.norm(self.z)**2 \
                 * (np.sqrt(1 + (1 - c_a**2) * np.linalg.norm(self.z)**2
                            / c_a**2) - 1)
-            self.A = c_a * self.A + update_coef * self.A.dot(np.outer(self.z, self.z))
+            Azz = self.A.dot(np.outer(self.z, self.z))
+            self.A = c_a * self.A + update_coef * Azz
 
 
 def fmin(f, x0, sigma0, plot=False):
@@ -154,7 +155,7 @@ def fmin(f, x0, sigma0, plot=False):
 
 class ActiveElitistES(BaseES):
     """
-    Implementation of the (1+1)-Cholesky-CMA-ES with active constraint handling.
+    Implementation of the (1+1)-Cholesky-CMA-ES with active CHT.
 
     It is the implementation of the algorithm presented in the article:
         'A (1+1)-CMA-ES for Constrained Optimisation'
@@ -180,7 +181,7 @@ class ActiveElitistES(BaseES):
         self.count_g = 0
 
         # Parameter settings
-        self.d = 1 + self.dim / 2  # controls the rate of the step size adaptation
+        self.d = 1 + self.dim / 2  # controls the rate of step size adaptation
         self.c = 2 / (self.dim + 2)
         self.c_p = 1 / 12  # learning rate of the average success
         self.p_target = 2 / 11  # target succes rate
@@ -263,7 +264,8 @@ class ActiveElitistES(BaseES):
                 self.v[j] *= (1 - self.c_c)
                 self.v[j] += self.c_c * self.A.dot(self.z)
                 self.w[j] = inv_A.dot(self.v[j])
-                summ += np.outer(self.v[j], self.w[j]) / self.w[j].T.dot(self.w[j])
+                summ += (np.outer(self.v[j], self.w[j])
+                         / self.w[j].T.dot(self.w[j]))
 
         if not feasible:
             self.A -= self.beta / np.sum([u > 0 for u in g]) * summ
@@ -302,14 +304,15 @@ class ActiveElitistES(BaseES):
 
         else:
             self.s *= 1 - self.c
-            self.alpha = 1 - self.c_cov_plus + self.c_cov_plus * self.c * (2 - self.c)
+            self.alpha = (1 - self.c_cov_plus
+                          + self.c_cov_plus * self.c * (2 - self.c))
 
         u = np.linalg.inv(self.A).dot(self.s)
         u2 = np.linalg.norm(u)**2
 
         self.A *= np.sqrt(self.alpha)
-        self.A += np.sqrt(self.alpha) * (np.sqrt(1 + self.c_cov_plus * u2
-                                                 / (self.alpha)) - 1) * np.outer(self.s, u) / u2
+        fac = (np.sqrt(1 + self.c_cov_plus * u2 / (self.alpha)) - 1)
+        self.A += np.sqrt(self.alpha) * fac * np.outer(self.s, u) / u2
 
         if np.isnan(self.A).any():
             raise RuntimeError
@@ -329,13 +332,14 @@ class ActiveElitistES(BaseES):
         z2 = np.linalg.norm(self.z)**2
 
         self.A *= np.sqrt(1 + self.c_cov_minus)
-        self.A += np.sqrt(1 + self.c_cov_minus) / z2 \
-            * (np.sqrt(1 - self.c_cov_minus * z2 / (1 + self.c_cov_minus)) - 1) \
-            * self.A.dot(np.outer(self.z, self.z))
+        self.A += (np.sqrt(1 + self.c_cov_minus) / z2
+                   * (np.sqrt(1 - self.c_cov_minus * z2
+                              / (1 + self.c_cov_minus)) - 1)
+                   * self.A.dot(np.outer(self.z, self.z)))
         assert not np.isnan(self.A).any()
 
 
-class FastActiveElitistES:
+class FastActiveElitistES(BaseES):
     """
     It is the implementation of the algorithm presented in the article:
     'A (1+1)-CMA-ES for Constrained Optimisation' by D. V. Arnold,
@@ -544,7 +548,7 @@ def fmin_con(objective, constraint, x0, sigma0, options=True, plot=False):
     """
     n_f = 0
     n_g = 0
-    es = FastActiveElitistES(x0, sigma0)
+    es = ActiveElitistES(x0, sigma0)
     sig = []
     vp = []
     std = []
