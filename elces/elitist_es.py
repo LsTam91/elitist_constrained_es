@@ -1,16 +1,64 @@
 import numpy as np
 
+ESOptions = {
+    "stop": {
+        "tolsig": 1e-8,
+        "tolstagnation": 1,
+        "tolfun": 1e-11,
+        "tolx": 1e-8,
+    }
+}
 
-class CholeskyElitistES:
+
+class BaseES:
+    """
+    Base class for an Evolution Strategy with active CHT
+
+    Implements shared methods:
+        - es.stop() with optional argument for inner loop (until feasible)
+    """
+
+    def stop(self, inner=False):
+        """
+        Stopping criteria
+
+        Set inner to true to test only for criteria related to the inner loop
+        """
+        if not inner:
+            if self.sigma < self.tolsig:
+                print("sigma")
+                return True
+            elif self.stagnation > self.tolstagnation:
+                # Stagnation crit
+                print("Stagnation crit")
+                return True
+            elif len(self.best) > 2 and self.best[-2] - self.best[-1] < self.tolfun:
+                # TolFun crit
+                print("TolFun crit")
+                return True
+            elif self.sigma * self.p_succ < self.tolx:
+                # tolx crit
+                print("tolx crit")
+                return True
+        if self.count_f >= self.tolcountf or self.count_g > self.tolcountg:
+            print("Number of evals exceeded")
+            return True
+        return False
+
+
+class CholeskyElitistES(BaseES):
     """
     Implementation of the (1+1)-Cholesky-CMA-ES without constraint.
+
     It is the implementation presented in the article:
-    'A Computational Efficient Covariance Matrix Update and a (1+1)CMA for
-    Evolution Strategies'
+        'A Computational Efficient Covariance Matrix Update and a (1+1)CMA for
+        Evolution Strategies'
     by C. Igel, T. Suttorp, and N. Hansen.
     """
 
-    def __init__(self, x0, sigma0):
+    def __init__(self, x0, sigma0, options=None):
+        if options is None:
+            options = ESOptions
         self.x = x0
         self.sigma = sigma0
         self.dim = len(x0)
@@ -28,10 +76,11 @@ class CholeskyElitistES:
         self.c_cov = 2 / (self.dim**2 + 6)
 
         # Parameters for stopping criterium :
-        self.tolsig = 1e-8
-        self.stagnation = 0
+        stop_options = options["stop"]
+        self.tolsig = stop_options
+        self.stagnation = stop_options
+        self.tolx = stop_options
         self.best = []
-        self.TolX = 1e-12 * sigma0
 
     def ask(self):
         """
@@ -80,27 +129,10 @@ class CholeskyElitistES:
                            / c_a**2) - 1)
             self.A = c_a * self.A + update_coef * self.A.dot(np.outer(self.z, self.z))
 
-    def stop(self):
-        """
-        Stopping criteria
-        """
-        if self.sigma < self.tolsig:
-            print("sigma")
-            return True
-        elif self.stagnation > 120 + 30 * self.dim:
-            print("Stagnation crit")
-            return True
-        elif len(self.best) > 2 and self.best[-2] - self.best[-1] < 1e-12:
-            print("TolFun crit")
-            return True
-        elif self.sigma * self.p_succ < self.TolX:
-            print("TolX crit")
-            return True
-
 
 def fmin(f, x0, sigma0, plot=False):
     """
-    Standard interface to unconstrained optimization
+    Standard interface for unconstrained optimization
     """
     es = CholeskyElitistES(x0, sigma0)
     sig = []
@@ -120,15 +152,17 @@ def fmin(f, x0, sigma0, plot=False):
     return es
 
 
-class ActiveElitistES:
+class ActiveElitistES(BaseES):
     """
+    Implementation of the (1+1)-Cholesky-CMA-ES with active constraint handling.
+
     It is the implementation of the algorithm presented in the article:
-    'A (1+1)-CMA-ES for Constrained Optimisation'
+        'A (1+1)-CMA-ES for Constrained Optimisation'
     by D. V. Arnold, and N. Hansen.
     """
 
     def __init__(self, x0, sigma0,
-                 tolsig=1e-10, tolfun=1e-9, TolX=1e-10
+                 tolsig=1e-10, tolfun=1e-9, tolx=1e-10
                  ):
 
         # Optimization variables
@@ -165,7 +199,7 @@ class ActiveElitistES:
         self.stagnation = 0
         self.tolstagnation = 120 + 30 * self.dim
         self.best = []
-        self.TolX = TolX * sigma0
+        self.tolx = tolx * sigma0
         self.tolcountf = np.inf
         self.tolcountg = np.inf
 
@@ -300,32 +334,6 @@ class ActiveElitistES:
             * self.A.dot(np.outer(self.z, self.z))
         assert not np.isnan(self.A).any()
 
-    def stop(self, inner=False):
-        """
-        Stopping criteria
-        Set inner to true to test only for criteria related to the inner loop
-        """
-        if not inner:
-            if self.sigma < self.tolsig:
-                print("sigma")
-                return True
-            elif self.stagnation > self.tolstagnation:
-                # Stagnation crit
-                print("Stagnation crit")
-                return True
-            elif len(self.best) > 2 and self.best[-2] - self.best[-1] < self.tolfun:
-                # TolFun crit
-                print("TolFun crit")
-                return True
-            elif self.sigma * self.p_succ < self.TolX:
-                # TolX crit
-                print("TolX crit")
-                return True
-        if self.count_f >= self.tolcountf or self.count_g > self.tolcountg:
-            print("Number of evals exceeded")
-            return True
-        return False
-
 
 class FastActiveElitistES:
     """
@@ -338,12 +346,12 @@ class FastActiveElitistES:
     """
 
     def __init__(self, x0, sigma0,
-                 tolsig=1e-10, tolfun=1e-9, TolX=1e-10
+                 tolsig=1e-10, tolfun=1e-9, tolx=1e-10
                  ):
         '''
         x0 : Assert the starting point is in the feaseble space!
         sigma0 : initial step size
-        tolsig, tolfun, TolX : stopping criteria,
+        tolsig, tolfun, tolx : stopping criteria,
         check pycma documentation for more information.
         '''
         # Optimization variables
@@ -385,7 +393,7 @@ class FastActiveElitistES:
         self.stagnation = 0
         self.tolstagnation = 120 + 30 * self.dim
         self.best = []
-        self.TolX = TolX * sigma0
+        self.tolx = tolx * sigma0
         self.tolcountf = np.inf
         self.tolcountg = np.inf
 
@@ -528,32 +536,6 @@ class FastActiveElitistES:
 
         self.invA = self.invA / a - (b / a**2) / (1 + z2 * b / a) * np.outer(self.z, self.z.T.dot(self.invA))
         assert not np.isnan(self.A).any()
-
-    def stop(self, inner=False):
-        """
-        Stopping criteria
-        Set inner to true to test only for criteria related to the inner loop
-        """
-        if not inner:
-            if self.sigma < self.tolsig:
-                print("sigma")
-                return True
-            elif self.stagnation > self.tolstagnation:
-                # Stagnation crit
-                print("Stagnation crit")
-                return True
-            elif len(self.best) > 2 and self.best[-2] - self.best[-1] < self.tolfun:
-                # TolFun crit
-                print("TolFun crit")
-                return True
-            elif self.sigma * self.p_succ < self.TolX:
-                # TolX crit
-                print("TolX crit")
-                return True
-        if self.count_f >= self.tolcountf or self.count_g > self.tolcountg:
-            print("Number of evals exceeded")
-            return True
-        return False
 
 
 def fmin_con(objective, constraint, x0, sigma0, options=True, plot=False):
