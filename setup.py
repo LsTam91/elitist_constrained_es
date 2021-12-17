@@ -11,7 +11,7 @@ setuptools.setup(
     description="Python implementation of the (1+1)-CMA-ES with active constraint handling",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    #url="https://github.com/pypa/sampleproject",
+    url="https://github.com/LsTam91/elitist_constrained_es",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
