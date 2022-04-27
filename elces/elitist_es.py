@@ -6,6 +6,11 @@ ESOptions = {
         "tolstagnation": 1,
         "tolfun": 1e-11,
         "tolx": 1e-8,
+        "tolcount": {
+            "f": np.inf,
+            "g": np.inf,
+            "fg": np.inf
+        }
     }
 }
 
@@ -40,10 +45,23 @@ class BaseES:
                 # tolx crit
                 print("tolx crit")
                 return True
-        if self.count_f >= self.tolcountf or self.count_g > self.tolcountg:
-            print("Number of evals exceeded")
-            return True
+
+        for key, tol in self.tolcount.items():
+            if self._count(key) >= tol:
+                print(f"Number of {key} evals exceeded")
+                return True
+
         return False
+
+
+    def _count(self, key):
+        if key == "fg":
+            return self.count_fg
+        elif key== "f":
+            return self.count_f
+        elif key == "g":
+            return self.count_g
+        raise ValueError("Wrong key to _count method")
 
 
 class CholeskyElitistES(BaseES):
@@ -163,8 +181,12 @@ class ActiveElitistES(BaseES):
     """
 
     def __init__(self, x0, sigma0,
-                 tolsig=1e-10, tolfun=1e-9, tolx=1e-10
+                 tolsig=1e-10, tolfun=1e-9, tolx=1e-10,
+                 tolcount=None
                  ):
+
+        if tolcount is None:
+            tolcount = {}
 
         # Optimization variables
         self.x = x0
@@ -201,10 +223,14 @@ class ActiveElitistES(BaseES):
         self.tolstagnation = 120 + 30 * self.dim
         self.best = []
         self.tolx = tolx * sigma0
-        self.tolcountf = np.inf
-        self.tolcountg = np.inf
+        self.tolcount = tolcount
 
         self.stop_now = False
+
+    @property
+    def count_fg(self):
+        return self.count_f + self.count_g
+
 
     def ask(self):
         """
@@ -542,13 +568,15 @@ class FastActiveElitistES(BaseES):
         assert not np.isnan(self.A).any()
 
 
-def fmin_con(objective, constraint, x0, sigma0, options=True, plot=False):
+def fmin_con(objective, constraint, x0, sigma0, disp=True, plot=False, options=None):
     """
     Interface for constrained optimization
     """
+    if options is None:
+        options = {}
     n_f = 0
     n_g = 0
-    es = ActiveElitistES(x0, sigma0)
+    es = ActiveElitistES(x0, sigma0, **options)
     sig = []
     vp = []
     std = []
@@ -565,7 +593,7 @@ def fmin_con(objective, constraint, x0, sigma0, options=True, plot=False):
             sig.append(es.sigma)
             std.append(np.diag(es.A.dot(es.A)))
 
-            if n_g % 1500 == 0 and options:
+            if n_g % 1500 == 0 and disp:
                 print("{0} evaluation of f and {1} of the constraint."
                       .format(n_f, n_g))
 
