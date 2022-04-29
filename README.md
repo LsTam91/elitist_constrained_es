@@ -9,6 +9,7 @@
     - ask-and-tell interface via `ActiveElitistES`
     - direct interface via `fmin_con`
 - Test problems with display utilities
+- Script to run the algorithm on BBOB problems under the `bbob` folder
 
 Everything implemented with Python and NumPy.
 
