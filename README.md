@@ -1,4 +1,4 @@
-# Python implementation for the (1+1)-CMA ES
+# Python implementation for the (1+1)-CMA-ES
 
 ## In this repository:
 
@@ -9,6 +9,9 @@
     - ask-and-tell interface via `ActiveElitistES`
     - direct interface via `fmin_con`
 - Test problems with display utilities
+- A second version of the (1+1)-CMA-ES for constrained optimisation with a faster update and an explanatory report
+    - ask-and-tell interface via `FasterActiveElitistES`
+    - report "Fast update report"
 
 Everything implemented with Python and NumPy.
 
