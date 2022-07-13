@@ -5,7 +5,7 @@
 - A Computational Efficient (1+1)-CMA-ES
     - ask-and-tell interface via `CholeskyElitistES`
     - direct interface via `fmin`
-- A (1+1)-CMA-ES for constrained optimisation (_in progress_)
+- A (1+1)-CMA-ES for constrained optimisation
     - ask-and-tell interface via `ActiveElitistES`
     - direct interface via `fmin_con`
 - Test problems with display utilities
